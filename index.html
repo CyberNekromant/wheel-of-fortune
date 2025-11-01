@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Колесо Фортуны</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 20px;
+    }
+    .controls {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .segment-editor-item {
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .segment-editor-item input[type="text"] {
+      width: 150px;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .wheel-container {
+      position: relative;
+      width: 420px;
+      height: 420px;
+      margin: 30px auto;
+    }
+    #wheel {
+      width: 100%;
+      height: 100%;
+      transform-origin: center;
+    }
+    .pointer {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-top: 40px solid #e74c3c;
+      z-index: 20;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+    }
+    #spin {
+      padding: 14px 32px;
+      font-size: 18px;
+      background: #2ecc71;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 20px 0;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    #spin:hover {
+      background: #27ae60;
+    }
+    #spin:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+    #result {
+      font-size: 22px;
+      font-weight: bold;
+      color: #2980b9;
+      min-height: 32px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <h1>🎡 Колесо Фортуны</h1>
+
+  <div class="controls">
+    <label>
+      Сегментов:
+      <input type="number" id="segmentCount" min="2" max="12" value="6" />
+    </label>
+    <button id="applySegments">Применить</button>
+  </div>
+
+  <div id="segmentEditor"></div>
+
+  <div class="wheel-container">
+    <svg id="wheel" viewBox="0 0 400 400"></svg>
+    <div class="pointer"></div>
+  </div>
+
+  <button id="spin">Крутить!</button>
+  <div id="result"></div>
+</div>
+
+<script>
+  // Генерация случайного яркого цвета
+  function getRandomColor() {
+    const colors = [
+      '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+      '#FF9F40', '#FF6384', '#4BC0C0', '#FF9F40', '#9966FF',
+      '#C9CBCF', '#8E44AD'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  }
+
+  // Начальное состояние: 6 сегментов
+  let wheelSegments = Array(6).fill().map((_, i) => ({
+    text: `Приз ${i + 1}`,
+    active: true,
+    color: getRandomColor()
+  }));
+
+  // Отрисовка колеса в SVG
+  function drawWheel() {
+    const svg = document.getElementById('wheel');
+    svg.innerHTML = '';
+
+    const centerX = 200;
+    const centerY = 200;
+    const radius = 180;
+    const total = wheelSegments.length;
+    const segmentAngleDeg = 360 / total;
+
+    for (let i = 0; i < total; i++) {
+      const startDeg = i * segmentAngleDeg - 90; // начинаем с верхней точки (0° = вверх)
+      const endDeg = (i + 1) * segmentAngleDeg - 90;
+
+      const startRad = (startDeg * Math.PI) / 180;
+      const endRad = (endDeg * Math.PI) / 180;
+
+      const x1 = centerX + radius * Math.cos(startRad);
+      const y1 = centerY + radius * Math.sin(startRad);
+      const x2 = centerX + radius * Math.cos(endRad);
+      const y2 = centerY + radius * Math.sin(endRad);
+
+      const largeArcFlag = segmentAngleDeg > 180 ? 1 : 0;
+
+      // Создаём сегмент (path)
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `
+        M ${centerX} ${centerY}
+        L ${x1} ${y1}
+        A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}
+        Z
+      `);
+      path.setAttribute('fill', wheelSegments[i].color);
+      path.setAttribute('stroke', '#ffffff');
+      path.setAttribute('stroke-width', '2');
+      svg.appendChild(path);
+
+      // Текст в сегменте
+      const midAngleDeg = (startDeg + endDeg) / 2;
+      const textRadius = radius * 0.6;
+      const tx = centerX + textRadius * Math.cos((midAngleDeg * Math.PI) / 180);
+      const ty = centerY + textRadius * Math.sin((midAngleDeg * Math.PI) / 180);
+
+      const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      textEl.setAttribute('x', tx);
+      textEl.setAttribute('y', ty);
+      textEl.setAttribute('text-anchor', 'middle');
+      textEl.setAttribute('dominant-baseline', 'middle');
+      textEl.setAttribute('fill', '#ffffff');
+      textEl.setAttribute('font-size', total <= 6 ? '16px' : '12px');
+      textEl.setAttribute('font-weight', 'bold');
+      textEl.textContent = wheelSegments[i].text;
+      svg.appendChild(textEl);
+    }
+  }
+
+  // Рендер редактора сегментов
+  function renderEditor() {
+    const editor = document.getElementById('segmentEditor');
+    editor.innerHTML = '';
+
+    wheelSegments.forEach((seg, i) => {
+      const div = document.createElement('div');
+      div.className = 'segment-editor-item';
+
+      const label = document.createElement('span');
+      label.textContent = `Сегмент ${i + 1}:`;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = seg.text;
+      input.addEventListener('input', (e) => {
+        wheelSegments[i].text = e.target.value;
+        drawWheel();
+      });
+
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.checked = seg.active;
+      toggle.addEventListener('change', (e) => {
+        wheelSegments[i].active = e.target.checked;
+        wheelSegments[i].color = e.target.checked ? getRandomColor() : '#CCCCCC';
+        drawWheel();
+      });
+
+      const toggleLabel = document.createElement('span');
+      toggleLabel.textContent = 'Активен';
+
+      div.append(label, input, toggle, toggleLabel);
+      editor.appendChild(div);
+    });
+  }
+
+  // Обработчик изменения количества сегментов
+  document.getElementById('applySegments').addEventListener('click', () => {
+    const count = parseInt(document.getElementById('segmentCount').value);
+    if (isNaN(count) || count < 2 || count > 12) {
+      alert('Укажите число от 2 до 12');
+      return;
+    }
+
+    wheelSegments = Array(count).fill().map((_, i) => ({
+      text: `Приз ${i + 1}`,
+      active: true,
+      color: getRandomColor()
+    }));
+
+    renderEditor();
+    drawWheel();
+  });
+
+  // Обработчик вращения
+  document.getElementById('spin').addEventListener('click', () => {
+    const activeSegments = wheelSegments
+      .map((seg, i) => ({ ...seg, index: i }))
+      .filter(seg => seg.active);
+
+    if (activeSegments.length === 0) {
+      alert('Нет активных сегментов для розыгрыша!');
+      return;
+    }
+
+    const winner = activeSegments[Math.floor(Math.random() * activeSegments.length)];
+    const winnerIndex = winner.index;
+
+    const segmentAngle = 360 / wheelSegments.length;
+    const extraRotations = 8 + Math.floor(Math.random() * 5); // 8–12 оборотов
+    const targetAngle = 360 * extraRotations + (360 - winnerIndex * segmentAngle);
+
+    const wheelEl = document.getElementById('wheel');
+
+    // Сброс трансформации для корректного старта анимации
+    wheelEl.style.transition = 'none';
+    wheelEl.style.transform = 'rotate(0deg)';
+    wheelEl.offsetHeight; // триггер перерисовки
+
+    // Плавное вращение с инерцией
+    wheelEl.style.transition = 'transform 6s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+    wheelEl.style.transform = `rotate(${targetAngle}deg)`;
+
+    // Очистка и вывод результата
+    document.getElementById('result').textContent = 'Крутим...';
+    setTimeout(() => {
+      document.getElementById('result').textContent = `🎉 Выпало: ${winner.text}!`;
+    }, 6000);
+  });
+
+  // Инициализация
+  renderEditor();
+  drawWheel();
+</script>
+
+</body>
+</html>
